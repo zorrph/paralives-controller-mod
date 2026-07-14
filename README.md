@@ -72,6 +72,14 @@ All mod bindings live in `BepInEx\config\net.kmarlin.paralives.controllermod.cfg
 - An empty value removes the gamepad binding for that action.
 - `[Advanced] DebugLogging = true` turns on verbose diagnostics — please enable it and attach `BepInEx\LogOutput.log` when reporting bugs.
 
+## Reporting issues
+
+Found a bug or a menu the controller can't reach? [Open an issue](https://github.com/zorrph/paralives-controller-mod/issues) — reports are genuinely welcome. The most useful reports include:
+
+1. **What you did and what happened** — e.g. "opened the build catalog, pressed D-pad down, focus jumped to the wrong item."
+2. **Your log file.** Set `DebugLogging = true` under `[Advanced]` in `BepInEx\config\net.kmarlin.paralives.controllermod.cfg`, reproduce the problem, then attach `BepInEx\LogOutput.log` from your Paralives folder. The debug log records exactly which buttons fired which actions.
+3. **Your setup** — controller model, mod version, and whether the game updated recently.
+
 ## Known limitations
 
 - Settings sliders and toggles are only partially controller-navigable; use the virtual cursor for those.
