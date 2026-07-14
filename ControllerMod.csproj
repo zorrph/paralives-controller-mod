@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <AssemblyName>ControllerMod</AssemblyName>
+    <Version>1.0.0</Version>
+
+    <!-- Path to your Paralives install (must have BepInEx 5 installed and run once).
+         Override on the command line if yours differs:
+           dotnet build -p:GamePath="D:\Games\Paralives" -->
+    <GamePath Condition="'$(GamePath)' == ''">F:\Steam\steamapps\common\Paralives</GamePath>
+    <ManagedPath>$(GamePath)\Paralives_Data\Managed</ManagedPath>
+    <BepInExCorePath>$(GamePath)\BepInEx\core</BepInExCorePath>
+  </PropertyGroup>
+
+<ItemGroup>
+  <Reference Include="BepInEx">
+    <HintPath>$(BepInExCorePath)\BepInEx.dll</HintPath>
+  </Reference>
+  <Reference Include="0Harmony">
+    <HintPath>$(BepInExCorePath)\0Harmony.dll</HintPath>
+  </Reference>
+  <Reference Include="Assembly-CSharp">
+    <HintPath>$(ManagedPath)\Assembly-CSharp.dll</HintPath>
+  </Reference>
+  <Reference Include="UnityEngine">
+    <HintPath>$(ManagedPath)\UnityEngine.dll</HintPath>
+  </Reference>
+  <Reference Include="UnityEngine.CoreModule">
+    <HintPath>$(ManagedPath)\UnityEngine.CoreModule.dll</HintPath>
+  </Reference>
+  <Reference Include="Unity.InputSystem">
+    <HintPath>$(ManagedPath)\Unity.InputSystem.dll</HintPath>
+  </Reference>
+  <Reference Include="Paralives">
+    <HintPath>$(ManagedPath)\Paralives.dll</HintPath>
+  </Reference>
+  <Reference Include="UnityEngine.UI">
+    <HintPath>$(ManagedPath)\UnityEngine.UI.dll</HintPath>
+  </Reference>
+  <Reference Include="UnityEngine.UIModule">
+    <HintPath>$(ManagedPath)\UnityEngine.UIModule.dll</HintPath>
+  </Reference>
+  <Reference Include="Unity.TextMeshPro">
+    <HintPath>$(ManagedPath)\Unity.TextMeshPro.dll</HintPath>
+  </Reference>
+  <Reference Include="UnityEngine.ImageConversionModule">
+    <HintPath>$(ManagedPath)\UnityEngine.ImageConversionModule.dll</HintPath>
+  </Reference>
+  <Reference Include="UnityEngine.TextCoreModule">
+    <HintPath>$(ManagedPath)\UnityEngine.TextCoreModule.dll</HintPath>
+  </Reference>
+</ItemGroup>
+
+<ItemGroup>
+  <!-- Xbox controller glyph atlas (Kenney Input Prompts, CC0), loaded at runtime into a
+       TMP_SpriteAsset - the game ships only a keyboard/mouse sprite atlas. -->
+  <EmbeddedResource Include="Resources\xbox_glyphs.png" />
+</ItemGroup>
+</Project>
