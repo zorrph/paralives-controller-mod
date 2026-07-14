@@ -2,6 +2,10 @@
 
 Full Xbox-controller support for [Paralives](https://store.steampowered.com/app/1118520/Paralives/), built on BepInEx. Play the whole game from the couch: menu navigation with real focus highlights, a BG3-style virtual cursor for everything pointy, sensible default bindings for every PC shortcut, Xbox button glyphs in tooltips and hint bars, and full rebinding via config file.
 
+## Disclaimer
+
+This is my first project of this type. I take no responsibility for corruption of game saves or issues experienced with the mod. Please download at your own risk. I only work on this when I have time, this is by no means official or remotely finished. This was a personal project that I wanted to do and I just wanted to share in case anyone found it useful.
+
 ## Features
 
 - **Menu navigation everywhere** — main menu, pause menu, interaction menus, and the build catalog (including the item grid, with auto-scroll) are all D-pad navigable with a visible focus highlight. A confirms, B backs out.
