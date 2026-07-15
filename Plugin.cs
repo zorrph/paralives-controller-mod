@@ -19,12 +19,17 @@ namespace ControllerMod
     [BepInPlugin(PluginGuid, "Paralives Controller Mod", PluginVersion)]
     public class Plugin : BaseUnityPlugin
     {
-        public const string PluginGuid = "net.kmarlin.paralives.controllermod";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginGuid = "com.zorrph.paralives.controllermod";
+        public const string PluginVersion = "1.1.1";
 
         // The pre-release development GUID - existing config files carry this name and are
         // migrated to the new one on first launch (the GUID names the .cfg file).
-        private const string LegacyGuid = "com.yourname.controllerfix";
+        // Older GUIDs whose config files migrate forward automatically, newest first.
+        private static readonly string[] LegacyGuids =
+        {
+            "net.kmarlin.paralives.controllermod", // v1.0.0-v1.1.0
+            "com.yourname.controllerfix",          // pre-release builds
+        };
 
         internal static ManualLogSource Log;
 
@@ -177,13 +182,21 @@ namespace ControllerMod
         {
             try
             {
-                string oldPath = System.IO.Path.Combine(Paths.ConfigPath, LegacyGuid + ".cfg");
                 string newPath = System.IO.Path.Combine(Paths.ConfigPath, PluginGuid + ".cfg");
-                if (System.IO.File.Exists(oldPath) && !System.IO.File.Exists(newPath))
+                if (System.IO.File.Exists(newPath))
                 {
-                    System.IO.File.Copy(oldPath, newPath);
-                    Config.Reload();
-                    Log.LogInfo($"Controller Fix: Migrated config from '{LegacyGuid}.cfg' to '{PluginGuid}.cfg'.");
+                    return;
+                }
+                foreach (var legacyGuid in LegacyGuids)
+                {
+                    string oldPath = System.IO.Path.Combine(Paths.ConfigPath, legacyGuid + ".cfg");
+                    if (System.IO.File.Exists(oldPath))
+                    {
+                        System.IO.File.Copy(oldPath, newPath);
+                        Config.Reload();
+                        Log.LogInfo($"Controller Fix: Migrated config from '{legacyGuid}.cfg' to '{PluginGuid}.cfg'.");
+                        return;
+                    }
                 }
             }
             catch (Exception e)

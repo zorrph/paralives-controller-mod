@@ -73,7 +73,7 @@ Cursor speed is configurable: `SpeedPixelsPerSecond` under `[Virtual Cursor]` in
 
 ## Rebinding
 
-All mod bindings live in `BepInEx\config\net.kmarlin.paralives.controllermod.cfg` (created on first launch). Edit with any text editor while the game is closed, or in-game with [ConfigurationManager](https://github.com/BepInEx/BepInEx.ConfigurationManager).
+All mod bindings live in `BepInEx\config\com.zorrph.paralives.controllermod.cfg` (created on first launch). Edit with any text editor while the game is closed, or in-game with [ConfigurationManager](https://github.com/BepInEx/BepInEx.ConfigurationManager).
 
 - Values are [Unity Input System control paths](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.4/manual/Controls.html#control-paths), e.g. `<Gamepad>/buttonNorth`.
 - Join two paths with `+` for a hold-modifier combo, e.g. `<Gamepad>/leftShoulder+<Gamepad>/buttonWest`.
@@ -85,7 +85,7 @@ All mod bindings live in `BepInEx\config\net.kmarlin.paralives.controllermod.cfg
 Found a bug or a menu the controller can't reach? [Open an issue](https://github.com/zorrph/paralives-controller-mod/issues) — reports are genuinely welcome. The most useful reports include:
 
 1. **What you did and what happened** — e.g. "opened the build catalog, pressed D-pad down, focus jumped to the wrong item."
-2. **Your log file.** Set `DebugLogging = true` under `[Advanced]` in `BepInEx\config\net.kmarlin.paralives.controllermod.cfg`, reproduce the problem, then attach `BepInEx\LogOutput.log` from your Paralives folder. The debug log records exactly which buttons fired which actions.
+2. **Your log file.** Set `DebugLogging = true` under `[Advanced]` in `BepInEx\config\com.zorrph.paralives.controllermod.cfg`, reproduce the problem, then attach `BepInEx\LogOutput.log` from your Paralives folder. The debug log records exactly which buttons fired which actions.
 3. **Your setup** — controller model, mod version, and whether the game updated recently.
 
 ## Known limitations

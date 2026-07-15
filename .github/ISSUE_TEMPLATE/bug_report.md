@@ -13,7 +13,7 @@ labels: bug
 
 **Log file**
 <!-- Set DebugLogging = true under [Advanced] in
-     BepInEx\config\net.kmarlin.paralives.controllermod.cfg,
+     BepInEx\config\com.zorrph.paralives.controllermod.cfg,
      reproduce the problem, then drag BepInEx\LogOutput.log into this issue. -->
 
 **Setup**
