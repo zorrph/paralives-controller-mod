@@ -20,7 +20,7 @@ namespace ControllerMod
     public class Plugin : BaseUnityPlugin
     {
         public const string PluginGuid = "net.kmarlin.paralives.controllermod";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.1.0";
 
         // The pre-release development GUID - existing config files carry this name and are
         // migrated to the new one on first launch (the GUID names the .cfg file).
@@ -50,7 +50,7 @@ namespace ControllerMod
 
         internal static UnityEngine.GameObject OwnGameObject;
 
-        // BG3-style world cursor: toggled with right-stick click (rightStickPress) by default,
+        // BG3-style world cursor: toggled with left-stick click (leftStickPress) by default,
         // configurable below. While active, the right stick moves the reticle instead of the
         // camera (View disabled).
         internal static bool VirtualCursorEnabled;
@@ -86,6 +86,8 @@ namespace ControllerMod
         internal static ConfigEntry<string> CfgCalendar;
         internal static ConfigEntry<string> CfgLotMode;
         internal static ConfigEntry<string> CfgDuplicateItem;
+        internal static ConfigEntry<string> CfgNoSnapHold;
+        internal static ConfigEntry<string> CfgMoveVerticallyHold;
         internal static ConfigEntry<string> CfgCursorToggleButton;
         internal static ConfigEntry<float> CfgCursorSpeed;
 
@@ -112,7 +114,7 @@ namespace ControllerMod
             CfgLargeRotateItem = Config.Bind(bindingsSection, "LargeRotateItem", "<Gamepad>/leftShoulder+<Gamepad>/buttonWest", "90-degree rotate of the selected object" + pathHelp);
             CfgToggleParaBuild = Config.Bind(bindingsSection, "ToggleParaBuild", "<Gamepad>/leftShoulder+<Gamepad>/select", "Toggle between live and build mode" + pathHelp);
             CfgTownMap = Config.Bind(bindingsSection, "TownMap", "<Gamepad>/select", "Open the town map" + pathHelp);
-            CfgPhotoMode = Config.Bind(bindingsSection, "PhotoMode", "<Gamepad>/leftStickPress", "Toggle photo mode" + pathHelp);
+            CfgPhotoMode = Config.Bind(bindingsSection, "PhotoMode", "<Gamepad>/rightStickPress", "Toggle photo mode" + pathHelp);
 
             // Keyboard-only actions given gamepad combos by this mod (found via the binding
             // audit). LB+D-pad = editing helpers, RB+D-pad = time controls.
@@ -131,10 +133,19 @@ namespace ControllerMod
             CfgCalendar = Config.Bind(bindingsSection, "Calendar", "<Gamepad>/rightShoulder+<Gamepad>/start", "Open the calendar (C equivalent)" + pathHelp);
             CfgLotMode = Config.Bind(bindingsSection, "LotMode", "<Gamepad>/leftShoulder+<Gamepad>/buttonNorth", "Lot mode (L equivalent)" + pathHelp);
             CfgDuplicateItem = Config.Bind(bindingsSection, "DuplicateItem", "<Gamepad>/rightShoulder+<Gamepad>/buttonWest", "Duplicate the selected item (Ctrl+V equivalent)" + pathHelp);
+            // Contextual hold-modifiers: these are gamepad control NAMES (not binding paths)
+            // because they don't bind to actions - ContextualTriggerModifiers ORs them into the
+            // game's InputManager.Alt/.Shift checks, but only while an item is being
+            // placed/moved/resized or a wall is being drawn. Trigger zoom is suspended during
+            // exactly that window, so LT/RT don't conflict with their normal camera-zoom role.
+            CfgNoSnapHold = Config.Bind(bindingsSection, "NoSnapHold", "leftTrigger",
+                "Gamepad control held for No Snap (Alt equivalent) while placing/moving an item or drawing a wall (a control name on the gamepad, e.g. leftTrigger); empty = disabled");
+            CfgMoveVerticallyHold = Config.Bind(bindingsSection, "MoveVerticallyHold", "rightTrigger",
+                "Gamepad control held to Move Vertically / grid-divide (Shift equivalent) while placing/moving an item or drawing a wall (a control name on the gamepad, e.g. rightTrigger); empty = disabled");
 
             const string cursorSection = "Virtual Cursor";
-            CfgCursorToggleButton = Config.Bind(cursorSection, "ToggleButton", "rightStickPress",
-                "Gamepad control that toggles the virtual cursor (a control name on the gamepad, e.g. rightStickPress, leftStickPress, select)");
+            CfgCursorToggleButton = Config.Bind(cursorSection, "ToggleButton", "leftStickPress",
+                "Gamepad control that toggles the virtual cursor (a control name on the gamepad, e.g. leftStickPress, rightStickPress, select)");
             CfgCursorSpeed = Config.Bind(cursorSection, "SpeedPixelsPerSecond", 1000f,
                 "How fast the virtual cursor moves at full stick deflection, in screen pixels per second");
 
@@ -152,6 +163,10 @@ namespace ControllerMod
             MigrateOldDefault(CfgTimeSpeed0, "<Gamepad>/rightShoulder+<Gamepad>/dpad/left");
             MigrateOldDefault(CfgTimeSpeed1, "<Gamepad>/rightShoulder+<Gamepad>/dpad/down");
             MigrateOldDefault(CfgTimeSpeed2, "<Gamepad>/rightShoulder+<Gamepad>/dpad/right");
+            // Stick clicks swapped 2026-07: cursor on LS-press feels more natural (per user
+            // feedback), photo mode moves to RS-press.
+            MigrateOldDefault(CfgPhotoMode, "<Gamepad>/leftStickPress");
+            MigrateOldDefault(CfgCursorToggleButton, "rightStickPress");
         }
 
         // BepInEx names the config file after the plugin GUID and loads it in the
@@ -401,7 +416,7 @@ namespace ControllerMod
                 var cursorManagerPrefix = AccessTools.Method(typeof(HideOSCursorPatch), nameof(HideOSCursorPatch.Prefix));
                 harmony.Patch(cursorManagerLateUpdate, prefix: new HarmonyMethod(cursorManagerPrefix));
 
-                Log.LogInfo("Controller Fix: Installed BG3-style virtual world cursor (toggle: right stick click).");
+                Log.LogInfo("Controller Fix: Installed BG3-style virtual world cursor (toggle: left stick click).");
 
                 // TranslationManager embeds keybinding hints into tooltip text via /{ActionName}
                 // placeholders, resolved through KeyRebindingManager.GetBindingIndex(action,
@@ -447,6 +462,32 @@ namespace ControllerMod
                 var injectionPrefix = AccessTools.Method(typeof(GamepadTooltipGlyphPatch), nameof(GamepadTooltipGlyphPatch.Prefix));
                 harmony.Patch(injectionMethod, prefix: new HarmonyMethod(injectionPrefix));
                 Log.LogInfo("Controller Fix: Tooltips now show Xbox button glyphs on controller.");
+
+                // "No Snap" (Alt) / "Move Vertically" (Shift) on the triggers, contextually -
+                // see ContextualTriggerModifiers for why the zoom suppression is scoped the way
+                // it is.
+                var altGetter = AccessTools.PropertyGetter(typeof(InputManager), "Alt");
+                var shiftGetter = AccessTools.PropertyGetter(typeof(InputManager), "Shift");
+                var onZoomMethod = AccessTools.Method(typeof(HybridPlayer), "OnZoom");
+                harmony.Patch(altGetter, postfix: new HarmonyMethod(AccessTools.Method(typeof(ContextualTriggerModifiers), nameof(ContextualTriggerModifiers.AltPostfix))));
+                harmony.Patch(shiftGetter, postfix: new HarmonyMethod(AccessTools.Method(typeof(ContextualTriggerModifiers), nameof(ContextualTriggerModifiers.ShiftPostfix))));
+                harmony.Patch(onZoomMethod, prefix: new HarmonyMethod(AccessTools.Method(typeof(ContextualTriggerModifiers), nameof(ContextualTriggerModifiers.OnZoomPrefix))));
+                Log.LogInfo("Controller Fix: LT = No Snap, RT = Move Vertically while placing items or drawing walls (trigger zoom suspended only then).");
+
+                // Options menu: left/right on a focused settings slider adjusts its value
+                // instead of navigating (works with UpdateOptionsFieldNavigation, which makes
+                // the slider rows focusable in the first place).
+                var groupNavigateMethod = AccessTools.Method(typeof(FocusableGroup), "Navigate");
+                var sliderAdjustPrefix = AccessTools.Method(typeof(SliderAdjustNavigatePatch), nameof(SliderAdjustNavigatePatch.Prefix));
+                harmony.Patch(groupNavigateMethod, prefix: new HarmonyMethod(sliderAdjustPrefix));
+                Log.LogInfo("Controller Fix: Settings sliders are D-pad navigable and adjustable (left/right changes the value).");
+
+                // While an item/wall is being carried the catalog window is still "open" but the
+                // player is working in the world - stop menu nav from eating the D-pad and A.
+                var uiNavigateMenuMethod = AccessTools.Method(typeof(UIManager), nameof(UIManager.NavigateMenu));
+                var placingNavPrefix = AccessTools.Method(typeof(MenuNavSuppressedWhilePlacingPatch), nameof(MenuNavSuppressedWhilePlacingPatch.Prefix));
+                harmony.Patch(uiNavigateMenuMethod, prefix: new HarmonyMethod(placingNavPrefix));
+                Log.LogInfo("Controller Fix: Menu navigation suspended while carrying an item (D-pad rotates/switches floors, A places).");
             }
             catch (Exception e)
             {
@@ -518,7 +559,9 @@ namespace ControllerMod
             UpdateDPadBuildActionGating();
             UpdateTimeStepping();
             UpdateCatalogScrollIntoView();
+            UpdateOptionsFieldNavigation();
             UpdateVirtualCursor();
+            ContextualTriggerModifiers.SuppressStaleZoom();
         }
 
         // D-pad left/right = step the game speed down/up, BG3/console-sim style:
@@ -545,13 +588,8 @@ namespace ControllerMod
                 {
                     return;
                 }
-                // While a menu is open the D-pad navigates it; while a shoulder is held the
-                // D-pad press belongs to a combo binding (LB+dpad = Undo/Redo/etc.,
-                // RB+dpad = build tools), not to time stepping.
-                if (IsAnyBlockingWindowOpen(hybridPlayer))
-                {
-                    return;
-                }
+                // While a shoulder is held the D-pad press belongs to a combo binding
+                // (LB+dpad = Undo/Redo/etc., RB+dpad = build tools), never to rotate/time.
                 if (gamepad.leftShoulder.isPressed || gamepad.rightShoulder.isPressed)
                 {
                     return;
@@ -560,6 +598,39 @@ namespace ControllerMod
                 bool stepSlower = gamepad.dpad.left.wasPressedThisFrame;
                 bool stepFaster = gamepad.dpad.right.wasPressedThisFrame;
                 if (!stepSlower && !stepFaster)
+                {
+                    return;
+                }
+
+                // D-pad left/right rotates instead of stepping time while an item is carried
+                // (menu nav is suspended then, so the D-pad is free even with the catalog open)
+                // or selected with no menu open. The game never wired ANY gamepad control to
+                // SmallRotateItem - the shoulders only ever meant "switch menu tab" - and bare
+                // LB/RB bindings would mis-fire a 45 whenever an LB+X 90 rotate starts.
+                bool windowOpen = IsAnyBlockingWindowOpen(hybridPlayer);
+                try
+                {
+                    var player = hybridPlayer.Player;
+                    bool holdingItem = player?.ItemInPlacement != null;
+                    bool selectedItem = player?.ItemSelected != null && !windowOpen;
+                    if (holdingItem || selectedItem)
+                    {
+                        SystemManager.Instance.RegisterMessage(new MessageRotateItem
+                        {
+                            RotateLeft = stepSlower,
+                            DoBigRotation = false,
+                            PlayerIndex = player.PlayerIndex
+                        });
+                        return;
+                    }
+                }
+                catch
+                {
+                    return; // Player not ready - don't fall through into time stepping blind
+                }
+
+                // While a menu is open the D-pad navigates it, not the clock.
+                if (windowOpen)
                 {
                     return;
                 }
@@ -679,6 +750,128 @@ namespace ControllerMod
             catch (Exception e)
             {
                 Log.LogError($"Controller Fix: Catalog scroll-into-view failed: {e.Message}");
+            }
+        }
+
+        // The options screen's right panel is inspector-generated: each row is a pooled
+        // UIFieldGameObject whose widgets are stock Unity UI (Slider, Toggle, TMP_InputField),
+        // not the game's Focusable system, so gamepad focus could never reach a slider. Fix, per
+        // frame while the options window is open:
+        //  1. Give every visible slider row a bare Focusable (all its virtuals are no-ops, so
+        //     it's inert except for participating in focus/nav).
+        //  2. Re-home every Focusable under the inspector (slider rows + the ParaButton/
+        //     ParaToggle rows the prefabs already carry) to the window's own FocusableGroup -
+        //     same nested-group trap as the build catalog.
+        //  3. Drive the row's ImageHighlighted as the focus visual for slider rows (bare
+        //     Focusables have no visuals; the game only uses ImageHighlighted in the mod-editor
+        //     split view, never in the options menu).
+        //  4. Scroll the focused row into the inspector's ScrollRect viewport.
+        // Left/right value adjustment lives in SliderAdjustNavigatePatch.
+        private Focusable _lastScrolledOptionsFocus;
+
+        private void UpdateOptionsFieldNavigation()
+        {
+            try
+            {
+                var commonWindow = HybridReferences.Instance?.UIManagerCommon?.CurrentWindow;
+                var perPlayerWindow = PlayerManager.Instance?.HybridPlayer1?.UIManager?.CurrentWindow;
+                var options = (commonWindow as UIOptions) ?? (perPlayerWindow as UIOptions);
+                if (options == null || options.UIInspector == null)
+                {
+                    _lastScrolledOptionsFocus = null;
+                    return;
+                }
+
+                FocusableGroup windowGroup = options;
+                var fieldGOs = options.UIInspector.GetComponentsInChildren<UIFieldGameObject>(includeInactive: false);
+                var focused = windowGroup.GetFocused(isShoulderButton: false);
+                foreach (var ufg in fieldGOs)
+                {
+                    bool isSliderRow = ufg.Slider != null && ufg.Slider.gameObject.activeInHierarchy
+                        && ufg.UIField is UIFieldSlider;
+                    var focusable = ufg.GetComponent<Focusable>();
+                    if (isSliderRow)
+                    {
+                        if (focusable == null)
+                        {
+                            focusable = ufg.gameObject.AddComponent<Focusable>();
+                        }
+                        else if (!focusable.enabled)
+                        {
+                            focusable.enabled = true;
+                        }
+                    }
+                    else if (focusable != null && focusable.enabled && focusable.GetType() == typeof(Focusable))
+                    {
+                        // Pooled row got reused for a non-slider field: retire our Focusable so
+                        // focus can't land on an invisible row (disable unregisters it).
+                        focusable.enabled = false;
+                    }
+
+                    // Row-level focus visual for EVERY row type: bare Focusables (sliders) have
+                    // no visuals at all, and the toggle prefabs have no gamepad-focus animation
+                    // either, so without this a focused toggle row looked like the D-pad press
+                    // did nothing.
+                    if (ufg.ImageHighlighted != null)
+                    {
+                        bool highlight = focused != null && focused.transform.IsChildOf(ufg.transform);
+                        if (ufg.ImageHighlighted.activeSelf != highlight)
+                        {
+                            ufg.ImageHighlighted.SetActive(highlight);
+                        }
+                    }
+                }
+
+                // Re-home: Focusable.OnEnable registers to the NEAREST group ancestor, which for
+                // inspector rows may be a nested group nothing ever drives. Move strays into the
+                // window's group so the game's own nav includes them. (Rows re-register to the
+                // nearest group every time pooling re-enables them, hence per-frame.)
+                foreach (var f in options.UIInspector.GetComponentsInChildren<Focusable>(includeInactive: false))
+                {
+                    var groupField = Traverse.Create(f).Field("_focusableGroup");
+                    var group = groupField.GetValue<FocusableGroup>();
+                    if (!ReferenceEquals(group, windowGroup))
+                    {
+                        group?.UnregisterFocusable(f);
+                        windowGroup.RegistrerFocusable(f); // sic - the game misspells it
+                        groupField.SetValue(windowGroup);
+                    }
+                }
+
+                // Scroll the focused row into view, once per focus change.
+                if (focused == null || ReferenceEquals(focused, _lastScrolledOptionsFocus))
+                {
+                    return;
+                }
+                _lastScrolledOptionsFocus = focused;
+                if (!focused.transform.IsChildOf(options.UIInspector.transform))
+                {
+                    return;
+                }
+                var scroll = focused.GetComponentInParent<ScrollRect>();
+                if (scroll == null || scroll.content == null)
+                {
+                    return;
+                }
+                var viewport = scroll.viewport != null ? scroll.viewport : scroll.GetComponent<RectTransform>();
+                var vpCorners = new Vector3[4];
+                viewport.GetWorldCorners(vpCorners);
+                var itemCorners = new Vector3[4];
+                ((RectTransform)focused.transform).GetWorldCorners(itemCorners);
+                float aboveBy = itemCorners[1].y - vpCorners[1].y;
+                float belowBy = vpCorners[0].y - itemCorners[0].y;
+                if (aboveBy > 0f)
+                {
+                    scroll.content.position -= new Vector3(0f, aboveBy, 0f);
+                }
+                else if (belowBy > 0f)
+                {
+                    scroll.content.position += new Vector3(0f, belowBy, 0f);
+                }
+            }
+            catch (Exception e)
+            {
+                Log.LogError($"Controller Fix: Options field navigation failed: {e.Message}");
             }
         }
 
@@ -802,6 +995,23 @@ namespace ControllerMod
             return perPlayerWindow != null || commonWindow != null;
         }
 
+        // True while the player is actively carrying an item or drawing a wall/fence. The build
+        // catalog stays CurrentWindow through all of that, so "a window is open" must NOT be
+        // treated as "the player is in a menu" during placement - world input (A to place,
+        // rotate, LT/RT modifiers, floor switching) has to keep flowing.
+        internal static bool IsItemOrNodeInPlacement(HybridPlayer hybridPlayer)
+        {
+            try
+            {
+                var player = hybridPlayer?.Player;
+                return player != null && (player.ItemInPlacement != null || player.NodeInPlacement != null);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private void UpdateDPadBuildActionGating()
         {
             if (Actions == null || PlayerManager.Instance == null)
@@ -812,7 +1022,9 @@ namespace ControllerMod
             var hybridPlayer = PlayerManager.Instance.HybridPlayer1;
             bool anyWindowOpen = IsAnyBlockingWindowOpen(hybridPlayer);
 
-            bool shouldBeEnabled = !anyWindowOpen;
+            // Placement keeps the catalog window open but the player is working in the world -
+            // floor switching (D-pad up/down) must stay live while carrying an item.
+            bool shouldBeEnabled = !anyWindowOpen || IsItemOrNodeInPlacement(hybridPlayer);
             if (shouldBeEnabled == _dpadBuildActionsEnabled)
             {
                 return;
@@ -914,7 +1126,7 @@ namespace ControllerMod
         private string _cursorToggleButtonName;
 
         // Resolves the configured toggle control name on the current gamepad, cached until the
-        // device or the config value changes. Falls back to rightStickPress on a bad name.
+        // device or the config value changes. Falls back to leftStickPress on a bad name.
         private UnityEngine.InputSystem.Controls.ButtonControl GetCursorToggleButton(Gamepad gamepad)
         {
             string configured = CfgCursorToggleButton.Value;
@@ -928,8 +1140,8 @@ namespace ControllerMod
             _cursorToggleButtonCache = gamepad.TryGetChildControl<UnityEngine.InputSystem.Controls.ButtonControl>(configured);
             if (_cursorToggleButtonCache == null)
             {
-                Log.LogWarning($"Controller Fix: Cursor ToggleButton '{configured}' not found on '{gamepad.displayName}', falling back to rightStickPress.");
-                _cursorToggleButtonCache = gamepad.rightStickButton;
+                Log.LogWarning($"Controller Fix: Cursor ToggleButton '{configured}' not found on '{gamepad.displayName}', falling back to leftStickPress.");
+                _cursorToggleButtonCache = gamepad.leftStickButton;
             }
             return _cursorToggleButtonCache;
         }
@@ -1359,11 +1571,14 @@ namespace ControllerMod
         {
             switch (actionName)
             {
+                // The mod's rotate-while-carrying handling in UpdateTimeStepping - the game
+                // itself never gave SmallRotateItem any gamepad control (LB/RB only ever
+                // switched menu tabs, despite what these glyphs used to claim).
                 case "SmallRotateItemLeft":
-                    spriteName = "lb";
+                    spriteName = "dpad_left";
                     return true;
                 case "SmallRotateItemRight":
-                    spriteName = "rb";
+                    spriteName = "dpad_right";
                     return true;
                 default:
                     spriteName = null;
@@ -1385,10 +1600,26 @@ namespace ControllerMod
                 case "leftclick":
                     spriteName = "a"; // A = click/confirm (incl. the virtual cursor)
                     return true;
+                case "alt":
+                    // The "alt"/"shift" tips only ever appear in the exact contexts where
+                    // ContextualTriggerModifiers makes the triggers act as those modifiers,
+                    // so show whichever control is configured (keyboard sprite if disabled).
+                    return TryGetSpriteForGamepadControlName(Plugin.CfgNoSnapHold.Value, out spriteName);
+                case "shift":
+                    return TryGetSpriteForGamepadControlName(Plugin.CfgMoveVerticallyHold.Value, out spriteName);
                 default:
                     spriteName = null;
                     return false;
             }
+        }
+
+        // Maps a bare gamepad control name from config ("leftTrigger") to its glyph by running
+        // it through the path mapper.
+        private static bool TryGetSpriteForGamepadControlName(string controlName, out string spriteName)
+        {
+            spriteName = null;
+            return !string.IsNullOrEmpty(controlName)
+                && TryGetSpriteForPath("<Gamepad>/" + controlName, out spriteName);
         }
 
         // Maps an Input System control path (e.g. "<Gamepad>/buttonSouth", "<Gamepad>/dpad/up")
@@ -1627,6 +1858,13 @@ namespace ControllerMod
                 {
                     return;
                 }
+                // While an item/wall is in placement the player is interacting with the WORLD
+                // even though the catalog window is still "open" - forcing over-UI here broke
+                // placing (A), rotate hold+drag, and Move Vertically, all gated on !IsPointerOverUI.
+                if (Plugin.IsItemOrNodeInPlacement(hybridPlayer))
+                {
+                    return;
+                }
                 var window = hybridPlayer.UIManager?.CurrentWindow;
                 if (window == null)
                 {
@@ -1640,6 +1878,323 @@ namespace ControllerMod
             catch
             {
                 // Managers not ready - leave the original result alone.
+            }
+        }
+    }
+
+    // While an item/wall is in placement, the D-pad/left-stick/A belong to the world (rotate,
+    // floors, place), not to the catalog window lurking behind it - without this, A would click
+    // the still-focused catalog item (spawning another item) at the same time as placing, and
+    // D-pad presses would scroll catalog focus around in the background. Back/B is handled
+    // outside NavigateMenu, so canceling placement is unaffected.
+    public static class MenuNavSuppressedWhilePlacingPatch
+    {
+        public static bool Prefix(HybridPlayer hybridPlayer)
+        {
+            try
+            {
+                if (hybridPlayer != null && hybridPlayer.IsUsingGamePad && Plugin.IsItemOrNodeInPlacement(hybridPlayer))
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+                // fall through to the original
+            }
+            return true;
+        }
+    }
+
+    // Options-panel navigation overrides, prefixed on FocusableGroup.Navigate (the single
+    // funnel for D-pad AND left-stick directional nav):
+    //  - Left/right on a focused slider row adjusts the slider's value instead of moving focus
+    //    (ints step exactly 1; decimals step 2% of the range, or one rounding increment if the
+    //    field rounds coarser than that - otherwise the game's per-frame refresh would snap the
+    //    value right back).
+    //  - Up/down inside the settings panel walks rows strictly in visual (top-to-bottom) order.
+    //    The game's spatial nav goes by angle-and-distance from the focused control's anchor,
+    //    and the anchors are all over the place (toggles sit at the row's right edge, buttons in
+    //    the middle), which made vertical movement skip rows. Stepping off either end falls back
+    //    to spatial nav so focus can leave the panel (e.g. back to the category list).
+    public static class SliderAdjustNavigatePatch
+    {
+        public static bool Prefix(FocusableGroup __instance, Vector2 direction, bool isShoulderButton)
+        {
+            try
+            {
+                if (isShoulderButton)
+                {
+                    return true;
+                }
+                var focused = __instance.GetFocused(isShoulderButton: false);
+                if (focused == null)
+                {
+                    return true;
+                }
+
+                if (direction.x != 0f && direction.y == 0f)
+                {
+                    return !TryAdjustSlider(focused, direction.x);
+                }
+                if (direction.y != 0f && direction.x == 0f)
+                {
+                    return !TryNavigateOptionsRows(__instance, focused, direction.y);
+                }
+                return true;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private static bool TryAdjustSlider(Focusable focused, float directionX)
+        {
+            var ufg = focused.GetComponent<UIFieldGameObject>();
+            var sliderField = ufg?.UIField as UIFieldSlider;
+            if (sliderField == null || ufg.Slider == null || !ufg.Slider.gameObject.activeInHierarchy)
+            {
+                return false;
+            }
+
+            float range = sliderField.MaxValue - sliderField.MinValue;
+            float normStep;
+            if (!sliderField.IsDecimalType)
+            {
+                normStep = range > 0f ? 1f / range : 1f;
+            }
+            else
+            {
+                normStep = 0.02f;
+                if (sliderField.RoundDecimal > -1 && range > 0f)
+                {
+                    normStep = Mathf.Max(normStep, Mathf.Pow(10f, -sliderField.RoundDecimal) / range);
+                }
+            }
+            // The slider itself is normalized 0..1 (SetValue maps the real value onto it);
+            // assigning .value (with notify) runs the game's OnSliderValueChanged pipeline,
+            // exactly like a mouse drag.
+            ufg.Slider.value = Mathf.Clamp01(ufg.Slider.value + normStep * Mathf.Sign(directionX));
+            return true;
+        }
+
+        private static readonly List<Focusable> RowsScratch = new List<Focusable>();
+
+        private static bool TryNavigateOptionsRows(FocusableGroup group, Focusable focused, float directionY)
+        {
+            var options = group as UIOptions;
+            if (options == null || options.UIInspector == null
+                || !focused.transform.IsChildOf(options.UIInspector.transform))
+            {
+                return false;
+            }
+
+            // One nav stop per field row: the prefabs carry extra invisible ParaButtons
+            // (unfold/search/etc.), and walking those made some transitions take two D-pad
+            // presses. Keep the row's real control - the main toggle/button/slider handle -
+            // and drop the rest.
+            RowsScratch.Clear();
+            var bestPerRow = new Dictionary<UIFieldGameObject, Focusable>();
+            foreach (var f in options.UIInspector.GetComponentsInChildren<Focusable>(includeInactive: false))
+            {
+                if (!f.isActiveAndEnabled || !f.Interactable || f.IsShoulderButton)
+                {
+                    continue;
+                }
+                var row = f.GetComponentInParent<UIFieldGameObject>();
+                if (row == null)
+                {
+                    RowsScratch.Add(f); // not part of a field row - keep as its own stop
+                    continue;
+                }
+                if (!bestPerRow.TryGetValue(row, out var current) || RowRank(f, row) > RowRank(current, row))
+                {
+                    bestPerRow[row] = f;
+                }
+            }
+            foreach (var f in bestPerRow.Values)
+            {
+                RowsScratch.Add(f);
+            }
+            RowsScratch.Sort((a, b) =>
+            {
+                int byY = b.transform.position.y.CompareTo(a.transform.position.y); // top first
+                return byY != 0 ? byY : a.transform.position.x.CompareTo(b.transform.position.x);
+            });
+
+            // Focus may currently sit on a focusable we filtered out (e.g. spatial nav landed
+            // on an unfold button) - resolve it to its row's representative before stepping.
+            int index = RowsScratch.IndexOf(focused);
+            if (index == -1)
+            {
+                var focusedRow = focused.GetComponentInParent<UIFieldGameObject>();
+                if (focusedRow != null && bestPerRow.TryGetValue(focusedRow, out var representative))
+                {
+                    index = RowsScratch.IndexOf(representative);
+                }
+                if (index == -1)
+                {
+                    return false;
+                }
+            }
+            int target = index + (directionY < 0f ? 1 : -1); // y=-1 means "down"
+            if (target < 0 || target >= RowsScratch.Count)
+            {
+                return false; // off either end: let spatial nav carry focus out of the panel
+            }
+            group.SetFocused(RowsScratch[target]);
+            return true;
+        }
+
+        // Which focusable represents a field row, when the prefab carries several: the slider
+        // handle we synthesize > the player-facing toggle > the row's action button > anything
+        // else (unfold/search/delete helpers).
+        private static int RowRank(Focusable f, UIFieldGameObject row)
+        {
+            if (f.GetType() == typeof(Focusable)) return 3;
+            if (f is ParaToggle) return 2;
+            if (row.ButtonAction != null && ReferenceEquals(f, row.ButtonAction)) return 1;
+            return 0;
+        }
+    }
+
+    // "No Snap" (Alt) and "Move Vertically"/grid-divide (Shift) are keyboard hold-modifiers with
+    // no gamepad equivalent. Nearly every check goes through the static InputManager.Alt/.Shift
+    // property getters, so postfixes there can OR in a gamepad trigger - but LT/RT natively zoom
+    // the camera, so the triggers only count as modifiers WHILE the player is manipulating
+    // something the modifiers apply to (item in placement/resize/scale/rotation, or a wall/fence
+    // node being drawn). During exactly that window, HybridPlayer.OnZoom is suppressed so a
+    // trigger pull doesn't also zoom; outside it, triggers zoom as normal and Alt/Shift are
+    // untouched. Known gap: a few legacy Input.GetKey(KeyCode.LeftAlt) call sites (chair-slot
+    // snapping in UpdateMoveItem, paint-hover in UpdateHover) bypass InputManager and still
+    // ignore the trigger.
+    public static class ContextualTriggerModifiers
+    {
+        private static Gamepad _cachedGamepad;
+        private static string _cachedNoSnapName, _cachedMoveVerticallyName;
+        private static UnityEngine.InputSystem.Controls.ButtonControl _noSnapControl, _moveVerticallyControl;
+
+        internal static bool Enabled =>
+            !string.IsNullOrEmpty(Plugin.CfgNoSnapHold.Value) || !string.IsNullOrEmpty(Plugin.CfgMoveVerticallyHold.Value);
+
+        // True while the player is manipulating something the Alt/Shift modifiers act on.
+        internal static bool ContextActive()
+        {
+            try
+            {
+                var hybridPlayer = PlayerManager.Instance?.HybridPlayer1;
+                if (hybridPlayer == null || !hybridPlayer.IsUsingGamePad)
+                {
+                    return false;
+                }
+                var player = hybridPlayer.Player;
+                if (player == null)
+                {
+                    return false;
+                }
+                return player.ItemInPlacement != null || player.NodeInPlacement != null
+                    || player.ItemInResize != null || player.ItemInScale != null
+                    || player.ItemInRotation != null;
+            }
+            catch
+            {
+                return false; // managers not ready
+            }
+        }
+
+        private static UnityEngine.InputSystem.Controls.ButtonControl Resolve(
+            string configured, ref string cachedName, ref UnityEngine.InputSystem.Controls.ButtonControl cachedControl)
+        {
+            var gamepad = Gamepad.current;
+            if (gamepad == null || string.IsNullOrEmpty(configured))
+            {
+                return null;
+            }
+            if (gamepad != _cachedGamepad)
+            {
+                _cachedGamepad = gamepad;
+                _cachedNoSnapName = _cachedMoveVerticallyName = null;
+                _noSnapControl = _moveVerticallyControl = null;
+            }
+            if (configured != cachedName)
+            {
+                cachedName = configured;
+                cachedControl = gamepad.TryGetChildControl<UnityEngine.InputSystem.Controls.ButtonControl>(configured);
+                if (cachedControl == null)
+                {
+                    Plugin.Log.LogWarning($"Controller Fix: Modifier control '{configured}' not found on '{gamepad.displayName}' - that modifier is disabled.");
+                }
+            }
+            return cachedControl;
+        }
+
+        internal static bool NoSnapHeld()
+        {
+            var control = Resolve(Plugin.CfgNoSnapHold.Value, ref _cachedNoSnapName, ref _noSnapControl);
+            return control != null && control.isPressed;
+        }
+
+        internal static bool MoveVerticallyHeld()
+        {
+            var control = Resolve(Plugin.CfgMoveVerticallyHold.Value, ref _cachedMoveVerticallyName, ref _moveVerticallyControl);
+            return control != null && control.isPressed;
+        }
+
+        public static void AltPostfix(ref bool __result)
+        {
+            if (!__result && NoSnapHeld() && ContextActive())
+            {
+                __result = true;
+            }
+        }
+
+        public static void ShiftPostfix(ref bool __result)
+        {
+            if (!__result && MoveVerticallyHeld() && ContextActive())
+            {
+                __result = true;
+            }
+        }
+
+        // Block trigger zoom while the triggers double as modifiers. OnZoom only fires on value
+        // CHANGES, so a stale nonzero Zoom.Value can survive entering the context (pull LT to
+        // zoom, then grab an item mid-pull) - SuppressStaleZoom below, called every frame from
+        // Plugin.Update, cleans that up.
+        public static bool OnZoomPrefix(HybridPlayer __instance)
+        {
+            try
+            {
+                if (Enabled && __instance.IsUsingGamePad && ContextActive())
+                {
+                    __instance.Zoom.SetValue(0f);
+                    return false;
+                }
+            }
+            catch
+            {
+                // fall through to the original
+            }
+            return true;
+        }
+
+        internal static void SuppressStaleZoom()
+        {
+            try
+            {
+                if (!Enabled || !ContextActive())
+                {
+                    return;
+                }
+                var hybridPlayer = PlayerManager.Instance?.HybridPlayer1;
+                if (hybridPlayer != null && hybridPlayer.Zoom.Value != 0f)
+                {
+                    hybridPlayer.Zoom.SetValue(0f);
+                }
+            }
+            catch
+            {
+                // managers not ready
             }
         }
     }

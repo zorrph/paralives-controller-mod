@@ -4,7 +4,7 @@
     <LangVersion>latest</LangVersion>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <AssemblyName>ControllerMod</AssemblyName>
-    <Version>1.0.0</Version>
+    <Version>1.1.0</Version>
 
     <!-- Path to your Paralives install (must have BepInEx 5 installed and run once).
          Override on the command line if yours differs:
