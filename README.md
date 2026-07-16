@@ -4,7 +4,7 @@ Full Xbox-controller support for [Paralives](https://store.steampowered.com/app/
 
 ## Disclaimer
 
-This is my first project of this type. I take no responsibility for corruption of game saves or issues experienced with the mod. Please download at your own risk. I only work on this when I have time, this is by no means official or remotely finished. This was a personal project that I wanted to do and I just wanted to share in case anyone found it useful.
+This is my first project of this type. I take no responsibility for corruption of game saves or issues experienced with the mod. Please download at your own risk. I only work on this when I have time, this is by no means official or remotely finished. This was a personal project that I wanted to do and I just wanted to share in case anyone found it useful. I hope it works for you! :)
 
 ## Features
 
